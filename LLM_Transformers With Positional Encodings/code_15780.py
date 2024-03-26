@@ -143,7 +143,7 @@ class LayerNorm(Module):
 
 class SelfAttention(Module):
     """ Multi-head self attention"""
-    def __init__(self, d, num_heads):
+    def __init__(self, d, num_heads, max_seq_length=None):
         super().__init__()
         self.wq = Linear(d,d)
         self.wk = Linear(d,d)
@@ -151,9 +151,13 @@ class SelfAttention(Module):
         self.wo = Linear(d,d)
         self.dim = d // num_heads
         self.num_heads = num_heads
+        self.max_seq_length=max_seq_length
         assert(self.dim * num_heads == d)
+    
+    def clear_cache(self):
+        pass
 
-    def forward(self, X, mask = None):
+    def forward(self, X, mask = None, use_kv_cache=False):
         # X in (B x T x d)
         B, T, d = X.shape
 
