@@ -3,7 +3,6 @@ import re
 from torch.nn import Module, Parameter, ModuleList
 import numpy as np
 
-
 def one_hot(Y, num_classes):
     """ Return one hot embedding vectors """
     return (torch.arange(num_classes)[None,:] == Y[:,None]).float()
@@ -216,3 +215,37 @@ class SGD:
             for param in self.params:
                 if param.grad is not None:
                     param.grad.zero_()
+
+class Adam:
+    def __init__(self, params, lr=1e-3, beta=0.9, gamma=0.999, eps=1e-8):
+        self.params=list(params)
+        self.lr=lr
+        self.beta=beta
+        self.gamma=gamma
+        self.eps=eps
+        self.i=1
+
+        self.u={}
+        self.v={}
+
+        for p in self.params:
+            self.u[p]=torch.zeros_like(p)
+            self.v[p]=torch.zeros_like(p)
+    
+    def step(self):
+        with torch.no_grad():
+            for p in self.params:
+                
+                self.u[p]=self.beta*self.u[p] + (1-self.beta)*p.grad
+                self.v[p]=self.gamma*self.v[p] + (1-self.gamma)*(p.grad**2)
+
+                uhat=self.u[p]/(1-self.beta**self.i)
+                vhat=self.v[p]/(1-self.gamma**self.i)
+
+                p -= (self.lr * uhat)/(torch.sqrt(vhat)+self.eps)
+    
+    def zero_grad(self):
+        with torch.no_grad():
+            for p in self.params:
+                if p.grad is not None:
+                    p.grad.zero_()
