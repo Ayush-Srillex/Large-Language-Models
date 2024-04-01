@@ -151,8 +151,12 @@ class SelfAttention(Module):
         self.wo = Linear(d,d)
         self.dim = d // num_heads
         self.num_heads = num_heads
-        self.max_seq_length=max_seq_length
+        self.max_seq_length=256
         assert(self.dim * num_heads == d)
+
+        self.i=0
+        self.k_cache=None
+        self.v_cache=None
     
     def clear_cache(self):
         pass
@@ -160,11 +164,38 @@ class SelfAttention(Module):
     def forward(self, X, mask = None, use_kv_cache=False):
         # X in (B x T x d)
         B, T, d = X.shape
+        # if use_kv_cache:
+            
+        #     if T>self.max_seq_length:
+        #         print("KV Cache")
+        #         self.k_cache=self.k_cache[:,-self.max_seq_length:,:]
+        #         self.v_cache=self.v_cache[:,-self.max_seq_length:,:]
+
 
         # Q, K, V => (B x h x T x d/h)
         Q = self.wq(X).view(B, T, self.num_heads, self.dim).transpose(1,2)
         K = self.wk(X).view(B, T, self.num_heads, self.dim).transpose(1,2)
         V = self.wv(X).view(B, T, self.num_heads, self.dim).transpose(1,2)
+
+        if use_kv_cache and self.k_cache is not None:
+            K=torch.cat((self.k_cache,K),dim=2)
+            V=torch.cat((self.v_cache,V),dim=2)
+            if self.max_seq_length is not None:
+                #print("KV Cache")
+                self.k_cache=self.k_cache[:,-self.max_seq_length:,:]
+                self.v_cache=self.v_cache[:,-self.max_seq_length:,:]
+            self.k_cache=K
+            self.v_cache=V
+
+        if use_kv_cache and self.k_cache is None:
+            self.k_cache=K
+            self.v_cache=V
+
+        
+
+        # Q = Q.view(B, T, self.num_heads, self.dim).transpose(1,2)
+        # K = K.view(B, T, self.num_heads, self.dim).transpose(1,2) #T in place of -1
+        # V = V.view(B, T, self.num_heads, self.dim).transpose(1,2)
 
         #Q @ K.T => B x h x T x T
         scores = Q @ K.transpose(2,3) / np.sqrt(self.dim)
@@ -239,7 +270,6 @@ class Adam:
     def step(self):
         with torch.no_grad():
             for p in self.params:
-                
                 self.u[p]=self.beta*self.u[p] + (1-self.beta)*p.grad
                 self.v[p]=self.gamma*self.v[p] + (1-self.gamma)*(p.grad**2)
 
